@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: actual-budget
+  namespace: default
+  labels:
+    app: actual-budget
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: actual-budget
+  template:
+    metadata:
+      labels:
+        app: actual-budget
+    spec:
+      containers:
+        - name: actual-budget
+          image: actualbudgetacrbmvsb5.azurecr.io/actual-budget:latest
+          ports:
+            - containerPort: 5006
+          env:
+            - name: ACTUAL_DATA_DIR
+              value: /data
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}

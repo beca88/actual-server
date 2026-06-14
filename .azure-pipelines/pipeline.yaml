@@ -1,0 +1,65 @@
+trigger:
+  branches:
+    include:
+      - master
+
+variables:
+  acrName: 'actualbudgetacrbmvsb5'
+  acrLoginServer: 'actualbudgetacrbmvsb5.azurecr.io'
+  imageName: 'actual-budget'
+  aksResourceGroup: 'rg-actualbudget-capstone'
+  aksClusterName: 'aks-actualbudget'
+
+stages:
+  - stage: Build
+    displayName: 'Build and Push Docker Image'
+    jobs:
+      - job: BuildPush
+        displayName: 'Build and Push to ACR'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Build and push image to ACR'
+            inputs:
+              azureSubscription: 'azure-service-connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az acr build \
+                  --registry $(acrName) \
+                  --image $(imageName):$(Build.BuildId) \
+                  --image $(imageName):latest \
+                  .
+
+  - stage: Deploy
+    displayName: 'Deploy to AKS'
+    dependsOn: Build
+    jobs:
+      - job: Deploy
+        displayName: 'Deploy to AKS'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Get AKS credentials'
+            inputs:
+              azureSubscription: 'azure-service-connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az aks get-credentials \
+                  --resource-group $(aksResourceGroup) \
+                  --name $(aksClusterName)
+
+          - task: KubernetesManifest@1
+            displayName: 'Deploy to Kubernetes'
+            inputs:
+              action: 'deploy'
+              connectionType: 'azureResourceManager'
+              azureSubscriptionConnection: 'azure-service-connection'
+              azureResourceGroup: $(aksResourceGroup)
+              kubernetesCluster: $(aksClusterName)
+              manifests: |
+                k8s/deployment.yaml
+                k8s/service.yaml
